@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Фитнес-Тренер</title>
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"></script>
+  <!-- TensorFlow.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0"></script>
+  <!-- TensorFlow.js PoseNet -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet@2.2.2"></script>
 </head>
 <body>
   <div class="container">
@@ -15,6 +18,7 @@
     <div class="button-group">
       <button id="startButton">Включить камеру</button>
       <button id="stopButton" style="display: none;">Выключить камеру</button>
+      <button id="resetButton">Сбросить счетчики</button>
     </div>
 
     <div class="upload-container">
@@ -26,17 +30,39 @@
     <div class="video-container">
       <video id="webcam" autoplay playsinline muted></video>
       <canvas id="output_canvas"></canvas>
+      <div id="status">Готов к работе</div>
     </div>
 
     <div class="info">
       <h2 id="exerciseName">Определение упражнения...</h2>
-      <p>Повторения: <span id="repCount">0</span></p>
-      <p>Время в планке: <span id="timer">0</span> сек</p>
-      <p id="feedback" class="feedback">Загрузка модели...</p>
+      <div class="stats">
+        <div class="stat">
+          <span class="label">Повторения:</span>
+          <span class="value" id="repCount">0</span>
+        </div>
+        <div class="stat">
+          <span class="label">Время планки:</span>
+          <span class="value" id="timer">0 сек</span>
+        </div>
+        <div class="stat">
+          <span class="label">Уверенность:</span>
+          <span class="value" id="confidence">0%</span>
+        </div>
+      </div>
+      <p id="feedback" class="feedback">Загрузка модели TensorFlow.js...</p>
+    </div>
+
+    <div class="exercises">
+      <h3>Поддерживаемые упражнения:</h3>
+      <div class="exercise-list">
+        <div class="exercise">🤸 Приседания</div>
+        <div class="exercise">🦵 Выпады</div>
+        <div class="exercise">🧍 Планка</div>
+        <div class="exercise">💪 Отжимания</div>
+      </div>
     </div>
   </div>
 
-  <!-- Подключаем скрипт без module -->
   <script src="script.js"></script>
 </body>
 </html>

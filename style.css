@@ -1,6 +1,6 @@
 body {
   font-family: 'Segoe UI', Arial, sans-serif;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
   color: white;
   margin: 0;
   padding: 20px;
@@ -8,119 +8,197 @@ body {
 }
 
 .container {
-  max-width: 900px;
+  max-width: 1000px;
   margin: 0 auto;
   text-align: center;
-  background: rgba(0,0,0,0.25);
+  background: rgba(255, 255, 255, 0.05);
   padding: 30px;
   border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  backdrop-filter: blur(10px);
 }
 
-h1 { font-size: 2.8em; margin-bottom: 10px; }
+h1 {
+  font-size: 2.8em;
+  margin-bottom: 10px;
+  background: linear-gradient(90deg, #00dbde, #fc00ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
 
-button, input[type="file"] + button {
-  padding: 12px 24px;
-  margin: 15px 10px;
-  font-size: 1.3em;
-  border-radius: 12px;
+.button-group {
+  margin: 25px 0;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+button {
+  padding: 14px 28px;
+  font-size: 1.1em;
+  border-radius: 50px;
   border: none;
   cursor: pointer;
-  background: #ff4757;
+  background: linear-gradient(90deg, #4776E6, #8E54E9);
   color: white;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(142, 84, 233, 0.3);
 }
 
-button:hover { background: #ff3747; }
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(142, 84, 233, 0.4);
+}
+
+#stopButton {
+  background: linear-gradient(90deg, #FF416C, #FF4B2B);
+}
+
+#resetButton {
+  background: linear-gradient(90deg, #11998e, #38ef7d);
+}
 
 .upload-container {
-  margin: 20px 0;
+  margin: 25px 0;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
 }
-
-.upload-container p { margin: 10px 0; }
 
 .video-container {
   position: relative;
   margin: 30px auto;
   width: 100%;
   max-width: 720px;
+  height: 480px;
   border-radius: 20px;
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  background: #000;
+  border: 3px solid #4776E6;
 }
 
 #webcam, #output_canvas {
   position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-#output_canvas { z-index: 10; }
+#output_canvas {
+  z-index: 2;
+}
 
-.info { margin-top: 20px; font-size: 1.6em; }
+#status {
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.7);
+  color: #00ff00;
+  padding: 5px;
+  font-size: 0.9em;
+  z-index: 3;
+}
+
+.info {
+  margin-top: 30px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+}
+
+#exerciseName {
+  font-size: 2em;
+  margin-bottom: 20px;
+  color: #38ef7d;
+}
+
+.stats {
+  display: flex;
+  justify-content: space-around;
+  margin: 20px 0;
+  flex-wrap: wrap;
+}
+
+.stat {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 15px 25px;
+  border-radius: 10px;
+  min-width: 150px;
+  margin: 10px;
+}
+
+.label {
+  display: block;
+  color: #aaa;
+  font-size: 0.9em;
+  margin-bottom: 5px;
+}
+
+.value {
+  display: block;
+  font-size: 2em;
+  font-weight: bold;
+  color: #00dbde;
+}
 
 .feedback {
-  font-size: 1.4em;
+  font-size: 1.3em;
   min-height: 60px;
   font-weight: bold;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  margin-top: 20px;
+}
+
+.exercises {
+  margin-top: 30px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+}
+
+.exercise-list {
+  display: flex;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.exercise {
+  padding: 15px 25px;
+  background: rgba(71, 118, 230, 0.2);
+  border-radius: 10px;
+  border: 2px solid #4776E6;
+  font-size: 1.1em;
 }
 
 @media (max-width: 768px) {
-  .video-container { height: 400px; }
-  h1 { font-size: 2.2em; }
-}
-
-.button-group {
-  margin: 20px 0;
-}
-
-.button-group button {
-  margin: 5px 10px;
-}
-
-#stopButton {
-  background: #2ed573;
-}
-
-#stopButton:hover {
-  background: #1dd663;
-}
-
-/* Индикатор активности камеры */
-.video-container::before {
-  content: '';
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #ff4757;
-  z-index: 20;
-  display: none;
-}
-
-.camera-active::before {
-  display: block;
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.3; }
-  100% { opacity: 1; }
-}
-
-/* Стили для состояния без камеры */
-.no-camera .video-container {
-  background: #333;
-  min-height: 400px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.no-camera .video-container::after {
-  content: 'Камера выключена';
-  color: white;
-  font-size: 1.2em;
+  .video-container { 
+    height: 350px;
+    max-width: 95%;
+  }
+  
+  h1 { font-size: 2em; }
+  
+  .stats {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .stat {
+    width: 80%;
+  }
+  
+  button {
+    padding: 12px 20px;
+    font-size: 1em;
+  }
 }
