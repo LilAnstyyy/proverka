@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Фитнес-Тренер</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>AI Фитнес-Тренер</h1>
+    <p>Встаньте перед камерой или загрузите фото для анализа техники</p>
+
+    <div class="button-group">
+      <button id="startButton">Включить камеру</button>
+      <button id="stopButton" style="display: none;">Выключить камеру</button>
+    </div>
+
+    <div class="upload-container">
+      <p>Или загрузите фото:</p>
+      <input type="file" id="photoUpload" accept="image/*">
+      <button id="analyzePhotoButton">Анализировать фото</button>
+    </div>
+
+    <div class="video-container">
+      <video id="webcam" autoplay playsinline muted></video>
+      <canvas id="output_canvas"></canvas>
+    </div>
+
+    <div class="info">
+      <h2 id="exerciseName">Определение упражнения...</h2>
+      <p>Повторения: <span id="repCount">0</span></p>
+      <p>Время в планке: <span id="timer">0</span> сек</p>
+      <p id="feedback" class="feedback">Готовы? Начните упражнение или загрузите фото!</p>
+    </div>
+  </div>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>
