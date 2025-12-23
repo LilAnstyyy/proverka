@@ -5,86 +5,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Фитнес-Тренер</title>
   <link rel="stylesheet" href="style.css">
-  <!-- MediaPipe CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14"></script>
 </head>
 <body>
   <div class="container">
-    <h1>🤖 AI Фитнес-Тренер</h1>
+    <h1>AI Фитнес-Тренер</h1>
     <p>Встаньте перед камерой или загрузите фото для анализа техники</p>
-    
-    <div class="progress-container">
-      <div class="progress-bar" id="progressBar"></div>
-      <div id="progressText">Загрузка модели: 0%</div>
-    </div>
 
-    <div class="button-group">
-      <button id="startButton">🎥 Включить камеру</button>
-      <button id="stopButton" style="display: none;">⏹️ Выключить камеру</button>
-      <button id="resetButton">🔄 Сбросить счетчики</button>
-    </div>
+    <button id="startButton">Включить камеру</button>
 
     <div class="upload-container">
       <p>Или загрузите фото:</p>
-      <div class="upload-box">
-        <input type="file" id="photoUpload" accept="image/*">
-        <button id="analyzePhotoButton">📷 Анализировать фото</button>
-      </div>
+      <input type="file" id="photoUpload" accept="image/*">
+      <button id="analyzePhotoButton">Анализировать фото</button>
     </div>
 
     <div class="video-container">
       <video id="webcam" autoplay playsinline muted></video>
       <canvas id="output_canvas"></canvas>
-      <div class="overlay">
-        <div id="status">Ожидание...</div>
-        <div id="fps">FPS: 0</div>
-      </div>
     </div>
 
-    <div class="info-panel">
-      <div class="panel-header">
-        <h2 id="exerciseName">Определение упражнения...</h2>
-        <div class="confidence" id="confidence">Уверенность: 0%</div>
-      </div>
-      
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon">🔄</div>
-          <div class="stat-label">Повторения</div>
-          <div class="stat-value" id="repCount">0</div>
-        </div>
-        
-        <div class="stat-card">
-          <div class="stat-icon">⏱️</div>
-          <div class="stat-label">Время планки</div>
-          <div class="stat-value" id="timer">0 сек</div>
-        </div>
-        
-        <div class="stat-card">
-          <div class="stat-icon">⚡</div>
-          <div class="stat-label">Состояние</div>
-          <div class="stat-value" id="state">Готов</div>
-        </div>
-      </div>
-      
-      <div class="feedback-box">
-        <div class="feedback-header">💡 Рекомендации:</div>
-        <p id="feedback" class="feedback">Подготовка к работе...</p>
-      </div>
-    </div>
-
-    <div class="instructions">
-      <h3>📋 Как пользоваться:</h3>
-      <ol>
-        <li>Дождитесь загрузки модели (зеленая полоса)</li>
-        <li>Нажмите "Включить камеру" и разрешите доступ</li>
-        <li>Встаньте на расстоянии 2-3 метра от камеры</li>
-        <li>Убедитесь, что все тело видно в кадре</li>
-        <li>Начните выполнять упражнение</li>
-      </ol>
+    <div class="info">
+      <h2 id="exerciseName">Определение упражнения...</h2>
+      <p>Повторения: <span id="repCount">0</span></p>
+      <p>Время в планке: <span id="timer">0</span> сек</p>
+      <p id="feedback" class="feedback">Готовы? Начните упражнение или загрузите фото!</p>
     </div>
   </div>
 
-  <script src="script.js"></script>
+  <script type="module" src="script.js"></script>
 </body>
-</html>ы
+</html>
