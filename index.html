@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Фитнес-Тренер</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"></script>
 </head>
 <body>
   <div class="container">
@@ -31,10 +32,11 @@
       <h2 id="exerciseName">Определение упражнения...</h2>
       <p>Повторения: <span id="repCount">0</span></p>
       <p>Время в планке: <span id="timer">0</span> сек</p>
-      <p id="feedback" class="feedback">Готовы? Начните упражнение или загрузите фото!</p>
+      <p id="feedback" class="feedback">Загрузка модели...</p>
     </div>
   </div>
 
-  <script type="module" src="script.js"></script>
+  <!-- Подключаем скрипт без module -->
+  <script src="script.js"></script>
 </body>
 </html>
