@@ -21,7 +21,7 @@ let squatStage = 'up';
 let lungeStage = 'standing';
 
 // Стабилизация
-const HISTORY_LENGTH = 5; // Уменьшим для более быстрой реакции
+const HISTORY_LENGTH = 5;
 let exerciseHistory = new Array(HISTORY_LENGTH).fill('none');
 let historyIndex = 0;
 
@@ -29,8 +29,11 @@ let historyIndex = 0;
 let lastKnownExerciseTime = 0;
 const RESET_AFTER_NONE_MS = 2000;
 
+// Флаг для отслеживания режима
+let isPhotoMode = false;
+
 /**
- * Инициализация моделей (оставляем как есть)
+ * Инициализация моделей
  */
 async function initPoseLandmarkerVideo() {
     if (poseLandmarkerVideo) return poseLandmarkerVideo;
@@ -80,7 +83,7 @@ function calculateAngle(a, b, c) {
 function mostFrequent(arr) {
     const count = {};
     arr.forEach(x => { 
-        if (x !== 'none') { // Игнорируем 'none' при подсчёте
+        if (x !== 'none') {
             count[x] = (count[x] || 0) + 1; 
         }
     });
@@ -93,71 +96,71 @@ function mostFrequent(arr) {
  * УЛУЧШЕННАЯ функция определения упражнения
  */
 function detectRawExercise(landmarks) {
-    // Проверяем, что получили все необходимые точки
     if (!landmarks || landmarks.length < 29) {
         return 'none';
     }
 
     const nose = landmarks[0];
     const lShoulder = landmarks[11], rShoulder = landmarks[12];
-    const lElbow = landmarks[13], rElbow = landmarks[14];
     const lHip = landmarks[23], rHip = landmarks[24];
     const lKnee = landmarks[25], rKnee = landmarks[26];
     const lAnkle = landmarks[27], rAnkle = landmarks[28];
 
     // Вычисляем углы
-    const leftKneeAngle  = calculateAngle(lHip, lKnee, lAnkle);
+    const leftKneeAngle = calculateAngle(lHip, lKnee, lAnkle);
     const rightKneeAngle = calculateAngle(rHip, rKnee, rAnkle);
-    const avgKneeAngle   = (leftKneeAngle + rightKneeAngle) / 2;
+    const avgKneeAngle = (leftKneeAngle + rightKneeAngle) / 2;
     
+    // Угол в тазобедренном суставе (плечо-таз-колено)
     const leftHipAngle = calculateAngle(lShoulder, lHip, lKnee);
     const rightHipAngle = calculateAngle(rShoulder, rHip, rKnee);
     const avgHipAngle = (leftHipAngle + rightHipAngle) / 2;
     
     const kneeDiff = Math.abs(leftKneeAngle - rightKneeAngle);
     
-    // Высота бедра относительно плеча (для определения положения тела)
+    // Высота для определения положения тела
     const avgShoulderY = (lShoulder.y + rShoulder.y) / 2;
     const avgHipY = (lHip.y + rHip.y) / 2;
-    const hipToShoulderRatio = avgHipY / avgShoulderY;
+    const bodyVerticalRatio = Math.abs(avgHipY - avgShoulderY);
     
     // Разница высоты плеч и бедер
     const shoulderHeightDiff = Math.abs(lShoulder.y - rShoulder.y);
     const hipHeightDiff = Math.abs(lHip.y - rHip.y);
 
     // УСЛОВИЯ ДЛЯ ПЛАНКИ:
-    // 1. Тело почти горизонтально (бедра не сильно ниже/выше плеч)
-    // 2. Ноги почти прямые
-    // 3. Локти согнуты или нет - не важно
+    // - Ноги почти прямые (большие углы в коленях)
+    // - Тело горизонтально (разница между плечами и бедрами небольшая)
+    // - Малая асимметрия
     const isPlank = 
-        hipToShoulderRatio > 0.95 && hipToShoulderRatio < 1.15 && // Тело горизонтально
-        avgKneeAngle > 150 && // Ноги почти прямые
-        shoulderHeightDiff < 0.15 && // Плечи ровно
-        hipHeightDiff < 0.15 && // Бедра ровно
-        avgHipAngle > 160; // Таз не поднят слишком высоко
+        avgKneeAngle > 160 &&           // Ноги почти прямые
+        kneeDiff < 20 &&                // Симметричные ноги
+        bodyVerticalRatio < 0.2 &&      // Тело горизонтально (плечи и бедра на одной высоте)
+        shoulderHeightDiff < 0.1 &&     // Плечи ровно
+        hipHeightDiff < 0.1 &&          // Бедра ровно
+        avgHipAngle > 150;              // Таз не слишком поднят
 
     // УСЛОВИЯ ДЛЯ ПРИСЕДАНИЙ:
-    // 1. Обе ноги согнуты примерно одинаково
-    // 2. Бедра опущены (ниже плеч)
-    // 3. Небольшая асимметрия
+    // - Обе ноги согнуты
+    // - Бедра опущены относительно плеч
+    // - Симметрично
     const isSquat = 
-        avgKneeAngle < 140 && // Ноги согнуты
-        kneeDiff < 30 && // Симметрично
-        avgHipAngle < 120 && // Таз опущен
-        hipToShoulderRatio > 1.2 && // Бедра ниже плеч
-        shoulderHeightDiff < 0.2; // Плечи ровно
+        avgKneeAngle < 120 &&           // Ноги согнуты
+        avgKneeAngle > 60 &&            // Не слишком сильно
+        kneeDiff < 25 &&                // Симметрично
+        bodyVerticalRatio > 0.3 &&      // Бедра ниже плеч
+        avgHipAngle < 120;              // Таз опущен
 
     // УСЛОВИЯ ДЛЯ ВЫПАДОВ:
-    // 1. Большая разница в углах коленей
-    // 2. Одно колено сильно согнуто, другое почти прямо
-    // 3. Бедра на разной высоте
+    // - Большая разница между коленями
+    // - Одно колено сильно согнуто, другое почти прямо
+    // - Бедра на разной высоте
     const isLunge = 
-        kneeDiff > 40 && // Большая асимметрия
-        Math.min(leftKneeAngle, rightKneeAngle) < 120 && // Одно колено сильно согнуто
-        Math.max(leftKneeAngle, rightKneeAngle) > 150 && // Другое почти прямо
-        hipHeightDiff > 0.1; // Бедра на разной высоте
+        kneeDiff > 50 &&                // Большая асимметрия
+        Math.min(leftKneeAngle, rightKneeAngle) < 100 &&  // Одно колено сильно согнуто
+        Math.max(leftKneeAngle, rightKneeAngle) > 140 &&  // Другое почти прямо
+        hipHeightDiff > 0.15;           // Бедра на разной высоте
 
-    // Приоритет определения (сначала проверяем более специфичные)
+    // Приоритет определения
     if (isPlank) return 'plank';
     if (isLunge) return 'lunges';
     if (isSquat) return 'squats';
@@ -182,36 +185,57 @@ function giveFeedback(exercise, landmarks) {
 
     switch(exercise) {
         case 'plank':
-            if (avgKneeAngle < 160) return "Выпрямите ноги сильнее!";
-            return "Хорошая планка! Держите спину прямо.";
+            if (avgKneeAngle < 160) return "Выпрямите ноги!";
+            return "Хорошая планка! Держите тело прямо.";
             
         case 'squats':
-            if (avgKneeAngle > 120) return "Приседайте глубже!";
+            if (avgKneeAngle > 100) return "Приседайте глубже!";
+            if (avgKneeAngle < 70) return "Слишком глубокий присед!";
             return "Хороший присед!";
             
         case 'lunges':
             const kneeDiff = Math.abs(leftKneeAngle - rightKneeAngle);
-            if (kneeDiff < 50) return "Сделайте выпад глубже!";
+            if (kneeDiff < 60) return "Сделайте выпад глубже!";
             return "Хороший выпад!";
             
         default:
-            return "Продолжайте в том же духе!";
+            return "Продолжайте!";
     }
 }
 
 /**
- * Обработка результатов детекции
+ * Обработка результатов детекции (только для видео)
  */
-function processResults(results, timestamp, isVideo = true) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    if (isVideo) {
+function processVideoResults(results, timestamp) {
+    if (!isPhotoMode) {
+        // Для видео: очищаем canvas и рисуем видео
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     }
+    
+    processLandmarks(results, timestamp);
+}
 
+/**
+ * Обработка результатов детекции (для фото)
+ */
+function processPhotoResults(results, timestamp, img) {
+    // Для фото: очищаем canvas и рисуем фото
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    
+    processLandmarks(results, timestamp);
+}
+
+/**
+ * Общая обработка landmarks (для видео и фото)
+ */
+function processLandmarks(results, timestamp) {
     if (results.landmarks?.length > 0) {
         const landmarks = results.landmarks[0];
         const drawingUtils = new DrawingUtils(ctx);
+        
+        // Рисуем скелет поверх изображения
         drawingUtils.drawConnectors(landmarks, PoseLandmarker.POSE_CONNECTIONS, { 
             color: '#00ff9d', 
             lineWidth: 4 
@@ -275,27 +299,11 @@ function processResults(results, timestamp, isVideo = true) {
                 }
             }
             
-            // Счётчик для выпадов (базовая логика)
-            if (currentExercise === 'lunges') {
-                const kneeDiff = Math.abs(
-                    calculateAngle(landmarks[23], landmarks[25], landmarks[27]) -
-                    calculateAngle(landmarks[24], landmarks[26], landmarks[28])
-                );
-                
-                if (lungeStage === 'standing' && kneeDiff > 50) {
-                    lungeStage = 'lunge';
-                } else if (lungeStage === 'lunge' && kneeDiff < 30) {
-                    lungeStage = 'standing';
-                    repCount++;
-                    repCountEl.textContent = repCount;
-                }
-            }
-            
             feedbackEl.textContent = giveFeedback(currentExercise, landmarks);
             feedbackEl.style.color = "#39ff14";
             
         } else {
-            // Если долго нет упражнения - сброс
+            // Если упражнение не определено
             if (timestamp - lastKnownExerciseTime > RESET_AFTER_NONE_MS) {
                 currentExercise = 'none';
                 exerciseHistory.fill('none');
@@ -303,6 +311,9 @@ function processResults(results, timestamp, isVideo = true) {
                 exerciseNameEl.textContent = 'Определение упражнения...';
                 exerciseNameEl.style.color = '#ffcc00';
                 feedbackEl.textContent = 'Встаньте в положение для упражнения';
+                feedbackEl.style.color = '#ffcc00';
+            } else {
+                feedbackEl.textContent = 'Упражнение не распознано. Проверьте позу.';
                 feedbackEl.style.color = '#ffcc00';
             }
         }
@@ -316,10 +327,10 @@ function processResults(results, timestamp, isVideo = true) {
  * Цикл обработки видео
  */
 function runVideoDetection() {
-    if (!currentPoseLandmarker) return;
+    if (!currentPoseLandmarker || isPhotoMode) return;
     const now = performance.now();
     const results = currentPoseLandmarker.detectForVideo(video, now);
-    processResults(results, now, true);
+    processVideoResults(results, now);
     requestAnimationFrame(runVideoDetection);
 }
 
@@ -328,6 +339,7 @@ function runVideoDetection() {
 // -----------------------
 document.getElementById('startButton').addEventListener('click', async () => {
     try {
+        isPhotoMode = false;
         currentPoseLandmarker = await initPoseLandmarkerVideo();
         
         const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -367,25 +379,36 @@ document.getElementById('analyzePhotoButton').addEventListener('click', async ()
         return;
     }
 
+    isPhotoMode = true;
     currentPoseLandmarker = await initPoseLandmarkerImage();
 
     const file = fileInput.files[0];
     const img = new Image();
     
     img.onload = async () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        
         try {
+            // Устанавливаем размер canvas под фото
+            canvas.width = img.width;
+            canvas.height = img.height;
+            
             // Очищаем canvas и рисуем фото
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             
+            // Анализируем фото
             const results = await currentPoseLandmarker.detect(img);
-            processResults(results, performance.now(), false);
             
-            feedbackEl.textContent = 'Фото проанализировано!';
-            feedbackEl.style.color = '#39ff14';
+            // Обрабатываем результаты (с фото)
+            processPhotoResults(results, performance.now(), img);
+            
+            // Обновляем обратную связь
+            if (results.landmarks?.length > 0) {
+                feedbackEl.textContent = 'Фото проанализировано! Упражнение определено.';
+                feedbackEl.style.color = '#39ff14';
+            } else {
+                feedbackEl.textContent = 'На фото не обнаружен человек.';
+                feedbackEl.style.color = '#ff4757';
+            }
             
         } catch (e) {
             console.error('Ошибка анализа фото:', e);
