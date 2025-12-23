@@ -5,64 +5,86 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI Фитнес-Тренер</title>
   <link rel="stylesheet" href="style.css">
-  <!-- TensorFlow.js -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0"></script>
-  <!-- TensorFlow.js PoseNet -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet@2.2.2"></script>
+  <!-- MediaPipe CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js"></script>
 </head>
 <body>
   <div class="container">
-    <h1>AI Фитнес-Тренер</h1>
+    <h1>🤖 AI Фитнес-Тренер</h1>
     <p>Встаньте перед камерой или загрузите фото для анализа техники</p>
+    
+    <div class="progress-container">
+      <div class="progress-bar" id="progressBar"></div>
+      <div id="progressText">Загрузка модели: 0%</div>
+    </div>
 
     <div class="button-group">
-      <button id="startButton">Включить камеру</button>
-      <button id="stopButton" style="display: none;">Выключить камеру</button>
-      <button id="resetButton">Сбросить счетчики</button>
+      <button id="startButton">🎥 Включить камеру</button>
+      <button id="stopButton" style="display: none;">⏹️ Выключить камеру</button>
+      <button id="resetButton">🔄 Сбросить счетчики</button>
     </div>
 
     <div class="upload-container">
       <p>Или загрузите фото:</p>
-      <input type="file" id="photoUpload" accept="image/*">
-      <button id="analyzePhotoButton">Анализировать фото</button>
+      <div class="upload-box">
+        <input type="file" id="photoUpload" accept="image/*">
+        <button id="analyzePhotoButton">📷 Анализировать фото</button>
+      </div>
     </div>
 
     <div class="video-container">
       <video id="webcam" autoplay playsinline muted></video>
       <canvas id="output_canvas"></canvas>
-      <div id="status">Готов к работе</div>
+      <div class="overlay">
+        <div id="status">Ожидание...</div>
+        <div id="fps">FPS: 0</div>
+      </div>
     </div>
 
-    <div class="info">
-      <h2 id="exerciseName">Определение упражнения...</h2>
-      <div class="stats">
-        <div class="stat">
-          <span class="label">Повторения:</span>
-          <span class="value" id="repCount">0</span>
+    <div class="info-panel">
+      <div class="panel-header">
+        <h2 id="exerciseName">Определение упражнения...</h2>
+        <div class="confidence" id="confidence">Уверенность: 0%</div>
+      </div>
+      
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">🔄</div>
+          <div class="stat-label">Повторения</div>
+          <div class="stat-value" id="repCount">0</div>
         </div>
-        <div class="stat">
-          <span class="label">Время планки:</span>
-          <span class="value" id="timer">0 сек</span>
+        
+        <div class="stat-card">
+          <div class="stat-icon">⏱️</div>
+          <div class="stat-label">Время планки</div>
+          <div class="stat-value" id="timer">0 сек</div>
         </div>
-        <div class="stat">
-          <span class="label">Уверенность:</span>
-          <span class="value" id="confidence">0%</span>
+        
+        <div class="stat-card">
+          <div class="stat-icon">⚡</div>
+          <div class="stat-label">Состояние</div>
+          <div class="stat-value" id="state">Готов</div>
         </div>
       </div>
-      <p id="feedback" class="feedback">Загрузка модели TensorFlow.js...</p>
+      
+      <div class="feedback-box">
+        <div class="feedback-header">💡 Рекомендации:</div>
+        <p id="feedback" class="feedback">Подготовка к работе...</p>
+      </div>
     </div>
 
-    <div class="exercises">
-      <h3>Поддерживаемые упражнения:</h3>
-      <div class="exercise-list">
-        <div class="exercise">🤸 Приседания</div>
-        <div class="exercise">🦵 Выпады</div>
-        <div class="exercise">🧍 Планка</div>
-        <div class="exercise">💪 Отжимания</div>
-      </div>
+    <div class="instructions">
+      <h3>📋 Как пользоваться:</h3>
+      <ol>
+        <li>Дождитесь загрузки модели (зеленая полоса)</li>
+        <li>Нажмите "Включить камеру" и разрешите доступ</li>
+        <li>Встаньте на расстоянии 2-3 метра от камеры</li>
+        <li>Убедитесь, что все тело видно в кадре</li>
+        <li>Начните выполнять упражнение</li>
+      </ol>
     </div>
   </div>
 
   <script src="script.js"></script>
 </body>
-</html>
+</html>ы
