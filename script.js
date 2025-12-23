@@ -8,38 +8,35 @@ const timerEl = document.getElementById('timer');
 const feedbackEl = document.getElementById('feedback');
 const exerciseNameEl = document.getElementById('exerciseName');
 
-// Две разные модели — для видео и для фото (разные runningMode)
 let poseLandmarkerVideo = null;
 let poseLandmarkerImage = null;
-let currentPoseLandmarker = null;   // текущая используемая модель
+let currentPoseLandmarker = null;
 
 // Счётчики и состояния
 let repCount = 0;
 let plankStartTime = 0;
 let currentExercise = 'none';
 let previousExercise = 'none';
-let squatStage = 'up';      // 'up' | 'down'
+let squatStage = 'up';
 let lungeStage = 'standing';
 
-// Стабилизация — последние N определений, чтобы избежать скачков
-const HISTORY_LENGTH = 10;  // уменьшили с 15 до 10 — быстрее реагируем на изменения
+// Стабилизация
+const HISTORY_LENGTH = 5; // Уменьшим для более быстрой реакции
 let exerciseHistory = new Array(HISTORY_LENGTH).fill('none');
 let historyIndex = 0;
 
-// Таймер для сброса при долгом отсутствии упражнения
+// Таймер для сброса
 let lastKnownExerciseTime = 0;
-const RESET_AFTER_NONE_MS = 1800; // 1.8 секунды "неопределённости" → полный сброс
+const RESET_AFTER_NONE_MS = 2000;
 
 /**
- * Инициализация модели для режима VIDEO
+ * Инициализация моделей (оставляем как есть)
  */
 async function initPoseLandmarkerVideo() {
     if (poseLandmarkerVideo) return poseLandmarkerVideo;
-
     const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
     );
-
     poseLandmarkerVideo = await PoseLandmarker.createFromOptions(vision, {
         baseOptions: {
             modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task",
@@ -48,20 +45,14 @@ async function initPoseLandmarkerVideo() {
         runningMode: "VIDEO",
         numPoses: 1
     });
-
     return poseLandmarkerVideo;
 }
 
-/**
- * Инициализация модели для режима IMAGE (для анализа фотографий)
- */
 async function initPoseLandmarkerImage() {
     if (poseLandmarkerImage) return poseLandmarkerImage;
-
     const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
     );
-
     poseLandmarkerImage = await PoseLandmarker.createFromOptions(vision, {
         baseOptions: {
             modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task",
@@ -70,7 +61,6 @@ async function initPoseLandmarkerImage() {
         runningMode: "IMAGE",
         numPoses: 1
     });
-
     return poseLandmarkerImage;
 }
 
@@ -85,103 +75,136 @@ function calculateAngle(a, b, c) {
 }
 
 /**
- * Находим самое частое значение в массиве (для стабилизации)
+ * Находим самое частое значение в массиве
  */
 function mostFrequent(arr) {
     const count = {};
-    arr.forEach(x => { count[x] = (count[x] || 0) + 1; });
-    return Object.keys(count).reduce((a, b) => count[a] > count[b] ? a : b, 'none');
+    arr.forEach(x => { 
+        if (x !== 'none') { // Игнорируем 'none' при подсчёте
+            count[x] = (count[x] || 0) + 1; 
+        }
+    });
+    const entries = Object.entries(count);
+    if (entries.length === 0) return 'none';
+    return entries.reduce((a, b) => a[1] > b[1] ? a[0] : b[0], 'none');
 }
 
 /**
- * Основная функция определения упражнения (самое важное место!)
+ * УЛУЧШЕННАЯ функция определения упражнения
  */
 function detectRawExercise(landmarks) {
+    // Проверяем, что получили все необходимые точки
+    if (!landmarks || landmarks.length < 29) {
+        return 'none';
+    }
+
     const nose = landmarks[0];
     const lShoulder = landmarks[11], rShoulder = landmarks[12];
+    const lElbow = landmarks[13], rElbow = landmarks[14];
     const lHip = landmarks[23], rHip = landmarks[24];
     const lKnee = landmarks[25], rKnee = landmarks[26];
     const lAnkle = landmarks[27], rAnkle = landmarks[28];
 
-    const leftKneeAngle  = calculateAngle(lHip,   lKnee,  lAnkle);
-    const rightKneeAngle = calculateAngle(rHip,   rKnee,  rAnkle);
+    // Вычисляем углы
+    const leftKneeAngle  = calculateAngle(lHip, lKnee, lAnkle);
+    const rightKneeAngle = calculateAngle(rHip, rKnee, rAnkle);
     const avgKneeAngle   = (leftKneeAngle + rightKneeAngle) / 2;
-
-    const leftBodyAngle  = calculateAngle(lShoulder, lHip, lAnkle);
-    const rightBodyAngle = calculateAngle(rShoulder, rHip, rAnkle);
-    const avgBodyAngle   = (leftBodyAngle + rightBodyAngle) / 2;
-
+    
+    const leftHipAngle = calculateAngle(lShoulder, lHip, lKnee);
+    const rightHipAngle = calculateAngle(rShoulder, rHip, rKnee);
+    const avgHipAngle = (leftHipAngle + rightHipAngle) / 2;
+    
     const kneeDiff = Math.abs(leftKneeAngle - rightKneeAngle);
+    
+    // Высота бедра относительно плеча (для определения положения тела)
+    const avgShoulderY = (lShoulder.y + rShoulder.y) / 2;
+    const avgHipY = (lHip.y + rHip.y) / 2;
+    const hipToShoulderRatio = avgHipY / avgShoulderY;
+    
+    // Разница высоты плеч и бедер
+    const shoulderHeightDiff = Math.abs(lShoulder.y - rShoulder.y);
+    const hipHeightDiff = Math.abs(lHip.y - rHip.y);
 
-    // Проверка положения головы относительно плеч (важно для исключения планки при стоянии)
-    const headIsBelow = nose.y > ((lShoulder.y + rShoulder.y) / 2 + 0.08);
+    // УСЛОВИЯ ДЛЯ ПЛАНКИ:
+    // 1. Тело почти горизонтально (бедра не сильно ниже/выше плеч)
+    // 2. Ноги почти прямые
+    // 3. Локти согнуты или нет - не важно
+    const isPlank = 
+        hipToShoulderRatio > 0.95 && hipToShoulderRatio < 1.15 && // Тело горизонтально
+        avgKneeAngle > 150 && // Ноги почти прямые
+        shoulderHeightDiff < 0.15 && // Плечи ровно
+        hipHeightDiff < 0.15 && // Бедра ровно
+        avgHipAngle > 160; // Таз не поднят слишком высоко
 
-    // Планка — очень строгие условия + обязательное положение головы ниже плеч
-    const isPlank =
-        avgBodyAngle > 165 &&
-        avgKneeAngle > 165 &&
-        kneeDiff < 16 &&
-        Math.abs(lHip.y - rHip.y) < 0.08 &&
-        Math.abs(lShoulder.y - rShoulder.y) < 0.08 &&
-        headIsBelow;
+    // УСЛОВИЯ ДЛЯ ПРИСЕДАНИЙ:
+    // 1. Обе ноги согнуты примерно одинаково
+    // 2. Бедра опущены (ниже плеч)
+    // 3. Небольшая асимметрия
+    const isSquat = 
+        avgKneeAngle < 140 && // Ноги согнуты
+        kneeDiff < 30 && // Симметрично
+        avgHipAngle < 120 && // Таз опущен
+        hipToShoulderRatio > 1.2 && // Бедра ниже плеч
+        shoulderHeightDiff < 0.2; // Плечи ровно
 
-    // Выпады — умеренно мягкие условия
-    const isLunge =
-        kneeDiff > 35 &&
-        Math.min(leftKneeAngle, rightKneeAngle) < 135 &&
-        Math.max(leftKneeAngle, rightKneeAngle) > 145;
+    // УСЛОВИЯ ДЛЯ ВЫПАДОВ:
+    // 1. Большая разница в углах коленей
+    // 2. Одно колено сильно согнуто, другое почти прямо
+    // 3. Бедра на разной высоте
+    const isLunge = 
+        kneeDiff > 40 && // Большая асимметрия
+        Math.min(leftKneeAngle, rightKneeAngle) < 120 && // Одно колено сильно согнуто
+        Math.max(leftKneeAngle, rightKneeAngle) > 150 && // Другое почти прямо
+        hipHeightDiff > 0.1; // Бедра на разной высоте
 
-    // Приседания — значительно смягчены пороги, чтобы ловить глубокие приседы
-    const isSquat =
-        avgKneeAngle < 155 &&              // раньше было 128 — слишком строго
-        avgKneeAngle > 50 &&               // защита от ложных срабатываний
-        kneeDiff < 35 &&                   // допускаем небольшую асимметрию
-        avgBodyAngle > 50 && avgBodyAngle < 170; // корпус может быть сильно наклонён
-
-    if (isPlank)  return 'plank';
-    if (isLunge)  return 'lunges';
-    if (isSquat)  return 'squats';
+    // Приоритет определения (сначала проверяем более специфичные)
+    if (isPlank) return 'plank';
+    if (isLunge) return 'lunges';
+    if (isSquat) return 'squats';
 
     return 'none';
 }
 
 /**
- * Формируем текстовую обратную связь по технике
+ * УПРОЩЕННАЯ функция обратной связи
  */
 function giveFeedback(exercise, landmarks) {
     if (exercise === 'none') {
-        return 'Не удалось определить упражнение. Попробуйте встать чётче или сменить ракурс.';
+        return 'Встаньте в положение упражнения (присед, выпад, планка)';
     }
 
-    const lShoulder = landmarks[11], lHip = landmarks[23], lKnee = landmarks[25];
+    const lHip = landmarks[23], lKnee = landmarks[25], lAnkle = landmarks[27];
+    const rHip = landmarks[24], rKnee = landmarks[26], rAnkle = landmarks[28];
+    
+    const leftKneeAngle = calculateAngle(lHip, lKnee, lAnkle);
+    const rightKneeAngle = calculateAngle(rHip, rKnee, rAnkle);
+    const avgKneeAngle = (leftKneeAngle + rightKneeAngle) / 2;
 
-    if (exercise === 'plank') {
-        const bodyAngle = calculateAngle(lShoulder, lHip, lKnee);
-        if (bodyAngle < 165) return "Поднимите таз — спина должна быть почти прямой!";
-        if (bodyAngle > 178) return "Не прогибайтесь в пояснице!";
-        return "Отлично! Держите тело ровно.";
+    switch(exercise) {
+        case 'plank':
+            if (avgKneeAngle < 160) return "Выпрямите ноги сильнее!";
+            return "Хорошая планка! Держите спину прямо.";
+            
+        case 'squats':
+            if (avgKneeAngle > 120) return "Приседайте глубже!";
+            return "Хороший присед!";
+            
+        case 'lunges':
+            const kneeDiff = Math.abs(leftKneeAngle - rightKneeAngle);
+            if (kneeDiff < 50) return "Сделайте выпад глубже!";
+            return "Хороший выпад!";
+            
+        default:
+            return "Продолжайте в том же духе!";
     }
-
-    if (exercise === 'squats') {
-        const avgKnee = (calculateAngle(lHip, lKnee, landmarks[27]) +
-                         calculateAngle(landmarks[24], landmarks[26], landmarks[28])) / 2;
-        if (avgKnee > 95) return "Опускайтесь ниже — бёдра хотя бы параллельно полу!";
-        return "Хорошая техника! Продолжайте.";
-    }
-
-    if (exercise === 'lunges') {
-        return "Следите за корпусом — держите его прямо. Заднее колено почти до пола.";
-    }
-
-    return "Техника выглядит нормально!";
 }
 
 /**
- * Обработка результатов детекции (видео или фото)
+ * Обработка результатов детекции
  */
 function processResults(results, timestamp, isVideo = true) {
-    ctx.save();
-
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
     if (isVideo) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     }
@@ -189,84 +212,104 @@ function processResults(results, timestamp, isVideo = true) {
     if (results.landmarks?.length > 0) {
         const landmarks = results.landmarks[0];
         const drawingUtils = new DrawingUtils(ctx);
-        drawingUtils.drawConnectors(landmarks, PoseLandmarker.POSE_CONNECTIONS, { color: '#00ff9d', lineWidth: 4 });
-        drawingUtils.drawLandmarks(landmarks, { color: '#ff3366', radius: 5 });
+        drawingUtils.drawConnectors(landmarks, PoseLandmarker.POSE_CONNECTIONS, { 
+            color: '#00ff9d', 
+            lineWidth: 4 
+        });
+        drawingUtils.drawLandmarks(landmarks, { 
+            color: '#ff3366', 
+            radius: 5 
+        });
 
         // Определяем упражнение
         const raw = detectRawExercise(landmarks);
         exerciseHistory[historyIndex] = raw;
         historyIndex = (historyIndex + 1) % HISTORY_LENGTH;
-
+        
         const stableExercise = mostFrequent(exerciseHistory);
 
-        // Если долго нет упражнения → полный сброс
-        if (stableExercise === 'none') {
-            if (performance.now() - lastKnownExerciseTime > RESET_AFTER_NONE_MS) {
-                currentExercise = 'none';
-                exerciseHistory.fill('none');
-                historyIndex = 0;
-                repCount = 0;
-                plankStartTime = 0;
-                squatStage = 'up';
-                repCountEl.textContent = '0';
-                timerEl.textContent = '0';
-                exerciseNameEl.textContent = 'Определение упражнения...';
-            }
-        } else {
-            lastKnownExerciseTime = performance.now();
-
-            // Смена упражнения только если стабильно новое
+        // Обновляем состояние только если упражнение определено
+        if (stableExercise !== 'none') {
+            lastKnownExerciseTime = timestamp;
+            
+            // Если упражнение изменилось
             if (stableExercise !== currentExercise) {
                 currentExercise = stableExercise;
-                previousExercise = currentExercise;
                 repCount = 0;
                 plankStartTime = 0;
                 squatStage = 'up';
                 lungeStage = 'standing';
                 repCountEl.textContent = '0';
                 timerEl.textContent = '0';
-
+                
+                // Обновляем название упражнения
                 const names = {
                     squats: 'Приседания',
                     lunges: 'Выпады',
-                    plank:  'Планка'
+                    plank: 'Планка'
                 };
-                exerciseNameEl.textContent = names[currentExercise] || 'Определение...';
+                exerciseNameEl.textContent = names[currentExercise] || 'Упражнение';
+                exerciseNameEl.style.color = '#39ff14';
             }
-        }
-
-        // Таймер планки
-        if (currentExercise === 'plank') {
-            if (plankStartTime === 0) plankStartTime = timestamp;
-            const seconds = Math.floor((timestamp - plankStartTime) / 1000);
-            timerEl.textContent = seconds;
+            
+            // Обработка специфичных для упражнения действий
+            if (currentExercise === 'plank') {
+                if (plankStartTime === 0) plankStartTime = timestamp;
+                const seconds = Math.floor((timestamp - plankStartTime) / 1000);
+                timerEl.textContent = seconds;
+            } else {
+                timerEl.textContent = '0';
+            }
+            
+            // Счётчик для приседаний
+            if (currentExercise === 'squats') {
+                const avgKneeAngle = (calculateAngle(landmarks[23], landmarks[25], landmarks[27]) +
+                                      calculateAngle(landmarks[24], landmarks[26], landmarks[28])) / 2;
+                
+                if (squatStage === 'up' && avgKneeAngle < 100) {
+                    squatStage = 'down';
+                } else if (squatStage === 'down' && avgKneeAngle > 140) {
+                    squatStage = 'up';
+                    repCount++;
+                    repCountEl.textContent = repCount;
+                }
+            }
+            
+            // Счётчик для выпадов (базовая логика)
+            if (currentExercise === 'lunges') {
+                const kneeDiff = Math.abs(
+                    calculateAngle(landmarks[23], landmarks[25], landmarks[27]) -
+                    calculateAngle(landmarks[24], landmarks[26], landmarks[28])
+                );
+                
+                if (lungeStage === 'standing' && kneeDiff > 50) {
+                    lungeStage = 'lunge';
+                } else if (lungeStage === 'lunge' && kneeDiff < 30) {
+                    lungeStage = 'standing';
+                    repCount++;
+                    repCountEl.textContent = repCount;
+                }
+            }
+            
+            feedbackEl.textContent = giveFeedback(currentExercise, landmarks);
+            feedbackEl.style.color = "#39ff14";
+            
         } else {
-            plankStartTime = 0;
-            timerEl.textContent = '0';
-        }
-
-        // Счёт повторений для приседаний
-        if (currentExercise === 'squats') {
-            const avgKneeAngle = (calculateAngle(landmarks[23], landmarks[25], landmarks[27]) +
-                                  calculateAngle(landmarks[24], landmarks[26], landmarks[28])) / 2;
-
-            if (squatStage === 'up' && avgKneeAngle < 95) {
-                squatStage = 'down';
-            } else if (squatStage === 'down' && avgKneeAngle > 150) {
-                squatStage = 'up';
-                repCount++;
-                repCountEl.textContent = repCount;
+            // Если долго нет упражнения - сброс
+            if (timestamp - lastKnownExerciseTime > RESET_AFTER_NONE_MS) {
+                currentExercise = 'none';
+                exerciseHistory.fill('none');
+                historyIndex = 0;
+                exerciseNameEl.textContent = 'Определение упражнения...';
+                exerciseNameEl.style.color = '#ffcc00';
+                feedbackEl.textContent = 'Встаньте в положение для упражнения';
+                feedbackEl.style.color = '#ffcc00';
             }
         }
-
-        feedbackEl.textContent = giveFeedback(currentExercise, landmarks);
-        feedbackEl.style.color = "#39ff14";
     } else {
-        feedbackEl.textContent = 'Человек не найден в кадре. Встаньте полностью.';
+        feedbackEl.textContent = 'Человек не найден в кадре';
         feedbackEl.style.color = '#ff4757';
     }
-
-    ctx.restore();
 }
 
 /**
@@ -284,22 +327,32 @@ function runVideoDetection() {
 // Кнопка запуска камеры
 // -----------------------
 document.getElementById('startButton').addEventListener('click', async () => {
-    currentPoseLandmarker = await initPoseLandmarkerVideo();
-
     try {
+        currentPoseLandmarker = await initPoseLandmarkerVideo();
+        
         const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: "user" } 
+            video: { 
+                facingMode: "user",
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            } 
         });
+        
         video.srcObject = stream;
-        video.play();
+        
         video.onloadedmetadata = () => {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
+            video.play();
             runVideoDetection();
+            feedbackEl.textContent = 'Камера запущена. Встаньте в положение упражнения';
+            feedbackEl.style.color = '#39ff14';
         };
+        
     } catch (err) {
         feedbackEl.textContent = "Ошибка доступа к камере: " + err.message;
         feedbackEl.style.color = '#ff4757';
+        console.error(err);
     }
 });
 
@@ -318,27 +371,33 @@ document.getElementById('analyzePhotoButton').addEventListener('click', async ()
 
     const file = fileInput.files[0];
     const img = new Image();
-    img.src = URL.createObjectURL(file);
-
+    
     img.onload = async () => {
         canvas.width = img.width;
         canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-
+        
         try {
-            const bitmap = await createImageBitmap(img);
-            const results = await currentPoseLandmarker.detect(bitmap);
+            // Очищаем canvas и рисуем фото
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            
+            const results = await currentPoseLandmarker.detect(img);
             processResults(results, performance.now(), false);
-            bitmap.close();
+            
+            feedbackEl.textContent = 'Фото проанализировано!';
+            feedbackEl.style.color = '#39ff14';
+            
         } catch (e) {
-            console.error(e);
+            console.error('Ошибка анализа фото:', e);
             feedbackEl.textContent = 'Ошибка анализа фото: ' + e.message;
             feedbackEl.style.color = '#ff4757';
         }
     };
-
+    
     img.onerror = () => {
-        feedbackEl.textContent = 'Не удалось загрузить изображение.';
+        feedbackEl.textContent = 'Не удалось загрузить изображение';
         feedbackEl.style.color = '#ff4757';
     };
+    
+    img.src = URL.createObjectURL(file);
 });
